@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="canonical" href="https://fucking-dj-tools.github.io/wtfcue" />
+  <meta property="og:url" content="https://fucking-dj-tools.github.io/wtfcue" />
+  
+  <title>WTFCue</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet" />
+
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['IBM Plex Mono', 'monospace'],
+            sans: ['IBM Plex Sans', 'sans-serif'],
+          },
+          colors: {
+            surface: '#0f1117',
+            panel:   '#181c27',
+            line:    '#2a2f3e',
+            muted:   '#4a5168',
+            dim:     '#7b82a0',
+            ink:     '#c8cde0',
+            bright:  '#e8ecf8',
+            accent:  '#5b7fff',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #0f1117; }
+    .drop-zone { transition: border-color 0.15s, background 0.15s; }
+    .drop-zone.drag-over { border-color: #5b7fff; background: rgba(91,127,255,0.06); }
+    textarea::placeholder { color: #4a5168; }
+    textarea:focus { outline: none; }
+    input:focus { outline: none; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2a2f3e; border-radius: 3px; }
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body class="font-sans text-ink min-h-screen p-8 pb-24">
+
+  <div id="app" v-cloak class="max-w-2xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-10">
+      <h1 class="font-mono text-4xl text-bright font-medium tracking-tight">WTFCue</h1>
+      <p class="text-ink text-base mt-2">Your tracklist, but readable.</p>
+      <p class="text-dim text-xs mt-4 leading-relaxed max-w-lg">
+        Your .cue file <em>sucks</em>. <strong>Duplicates</strong> everywhere, readable by nobody.<br>
+        10 seconds and you'll have a clean <strong>human-readable tracklist</strong> for your damn DJ set — ready for <strong>Youtube or Soundcloud</strong>.
+      </p>
+    </div>
+
+    <!-- SECTION 1 -->
+    <div class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="font-mono text-xs text-accent border border-accent/40 rounded px-2 py-0.5">01</span>
+        <span class="text-bright text-sm font-medium">drop your .cue file</span>
+      </div>
+
+      <!-- Tab switcher -->
+      <div class="flex gap-1 mb-4 bg-panel border border-line rounded-lg p-1 w-fit">
+        <button
+          @click="mode = 'file'"
+          :class="mode === 'file' ? 'bg-accent/20 text-accent border-accent/30' : 'text-dim hover:text-ink border-transparent'"
+          class="font-mono text-xs px-4 py-1.5 rounded border transition-colors flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="M9 1H3.5A1.5 1.5 0 0 0 2 2.5v11A1.5 1.5 0 0 0 3.5 15h9A1.5 1.5 0 0 0 14 13.5V6L9 1Z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 1v5h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          drop a file
+        </button>
+        <button
+          @click="mode = 'paste'"
+          :class="mode === 'paste' ? 'bg-accent/20 text-accent border-accent/30' : 'text-dim hover:text-ink border-transparent'"
+          class="font-mono text-xs px-4 py-1.5 rounded border transition-colors flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="4" y="3" width="9" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M6 3V2.5A1.5 1.5 0 0 1 7.5 1h1A1.5 1.5 0 0 1 10 2.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="7" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+            <line x1="7" y1="9.5" x2="11" y2="9.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+            <line x1="7" y1="12" x2="9.5" y2="12" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+          </svg>
+          paste the shit
+        </button>
+      </div>
+
+      <!-- File drop zone -->
+      <div v-if="mode === 'file'">
+        <div
+          class="drop-zone border-2 border-dashed border-line rounded-xl p-12 text-center cursor-pointer"
+          :class="{ 'drag-over': isDragging }"
+          @click="$refs.fileInput.click()"
+          @dragover.prevent="isDragging = true"
+          @dragleave="isDragging = false"
+          @drop.prevent="onDrop">
+          <input ref="fileInput" type="file" accept=".cue" class="hidden" @change="onFileChange" />
+          <div v-if="!fileName">
+            <svg class="mx-auto mb-4 text-muted" width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p class="text-ink text-sm mb-1">Drop a <span class="font-mono text-accent">.cue</span> file here</p>
+            <p class="text-dim text-xs">or click to browse</p>
+          </div>
+          <div v-else class="flex items-center justify-center gap-3">
+            <span class="text-accent">&#10003;</span>
+            <span class="font-mono text-sm text-bright">{{ fileName }}</span>
+            <button @click.stop="clearAll" class="font-mono text-xs text-muted hover:text-ink transition-colors ml-2">clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paste zone -->
+      <div v-if="mode === 'paste'">
+        <div class="border border-line rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-line bg-panel">
+            <span class="font-mono text-xs text-muted">raw .cue content</span>
+            <button v-if="pasteContent" @click="clearAll" class="font-mono text-xs text-muted hover:text-ink transition-colors">clear</button>
+          </div>
+          <textarea
+            v-model="pasteContent"
+            @input="onPasteInput"
+            rows="12"
+            placeholder="Paste the contents of your .cue file here..."
+            class="w-full bg-panel font-mono text-xs text-ink leading-relaxed p-4 resize-none">
+          </textarea>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div v-if="parseError" class="mt-3 flex items-center gap-2">
+        <span class="font-mono text-xs text-red-400">&#10005;</span>
+        <span class="font-mono text-xs text-red-400/70">{{ parseError }}</span>
+      </div>
+    </div>
+
+    <!-- SECTION 2 -->
+    <div v-if="tracks.length > 0" class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="font-mono text-xs text-accent border border-accent/40 rounded px-2 py-0.5">02</span>
+        <span class="text-bright text-sm font-medium">kill the dupes</span>
+        <span class="font-mono text-xs text-dim ml-auto flex items-center gap-3">
+          <span>
+            {{ visibleTracks.length }} tracks
+            <span v-if="dupeCount > 0" class="text-red-400/70"> &middot; {{ dupeCount }} dupes</span>
+          </span>
+          <button
+            v-if="dupeCount > 0"
+            @click="killAllDupes"
+            class="font-mono text-xs text-red-400/70 border border-red-500/25 rounded px-2 py-0.5 hover:text-red-300 hover:border-red-400/40 transition-colors">
+            kill them all
+          </button>
+        </span>
+      </div>
+
+      <!-- Track list — left gutter for dynamic index -->
+      <div class="flex flex-col gap-1">
+        <div
+          v-for="(track, i) in visibleTracks"
+          :key="track.index"
+          class="flex items-center gap-3">
+
+          <!-- Position index outside the card -->
+          <span class="font-mono text-xs text-muted w-5 text-right shrink-0 tabular-nums select-none">{{ i + 1 }}</span>
+
+          <!-- Card -->
+          <div
+            :class="track.isDupe
+              ? 'bg-red-500/5 border-red-500/20 hover:border-red-500/35'
+              : 'bg-panel border-line hover:border-muted'"
+            class="flex flex-1 items-start gap-3 px-4 py-3 border rounded-lg transition-colors group">
+
+            <!-- Timestamp -->
+            <span
+              :class="track.isDupe ? 'text-red-400/50' : 'text-accent/60'"
+              class="font-mono text-xs shrink-0 w-16 tabular-nums pt-px">
+              {{ track.rawTimestamp }}
+            </span>
+
+            <!-- Performer — Title -->
+            <span class="flex-1 text-sm min-w-0 break-words">
+              <span :class="track.isDupe ? 'text-red-300/60' : 'text-ink'">{{ track.performer }}</span>
+              <span :class="track.isDupe ? 'text-red-400/30' : 'text-muted'" class="mx-1.5">&mdash;</span>
+              <span :class="track.isDupe ? 'text-red-300/60' : 'text-bright'">{{ track.title }}</span>
+            </span>
+
+            <!-- Dupe badge -->
+            <span v-if="track.isDupe" class="font-mono text-xs text-red-400/60 border border-red-500/20 rounded px-1.5 py-0.5 shrink-0">
+              dupe
+            </span>
+
+            <!-- Remove -->
+            <button
+              @click="removeTrack(track.index)"
+              :class="track.isDupe ? 'text-red-400/40 hover:text-red-300' : 'text-muted hover:text-bright'"
+              class="font-mono text-sm leading-none opacity-0 group-hover:opacity-100 transition-all shrink-0">
+              &#10005;
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3 -->
+    <div v-if="visibleTracks.length > 0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="font-mono text-xs text-accent border border-accent/40 rounded px-2 py-0.5">03</span>
+        <span class="text-bright text-sm font-medium">export</span>
+      </div>
+
+      <!-- Separator control -->
+      <div class="flex items-center gap-3 mb-4">
+        <span class="font-mono text-xs text-dim shrink-0">separator</span>
+        <input
+          v-model="separator"
+          maxlength="5"
+          spellcheck="false"
+          class="font-mono text-xs text-bright bg-panel border border-line rounded px-3 py-1.5 w-20 focus:border-accent/50 transition-colors"
+        />
+        <span class="font-mono text-xs text-muted">between timestamp and track info</span>
+      </div>
+
+      <!-- Preview panel -->
+      <div class="border border-line rounded-xl overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-line bg-panel">
+          <span class="font-mono text-xs text-muted flex items-center gap-2">
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+              <path d="M8 1l2 4.5h4.5L11 8.5l1.5 4.5L8 10.5 4.5 13l1.5-4.5L2.5 5.5H7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+            </svg>
+            youtube / soundcloud chapters
+          </span>
+          <button
+            @click="copyToClipboard"
+            class="font-mono text-xs flex items-center gap-1.5 transition-colors"
+            :class="copied ? 'text-green-400' : 'text-dim hover:text-bright'">
+            <svg v-if="!copied" width="11" height="11" viewBox="0 0 16 16" fill="none">
+              <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <svg v-else width="11" height="11" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ copied ? 'copied!' : 'copy' }}
+          </button>
+        </div>
+        <div class="p-4 font-mono text-xs text-ink leading-loose whitespace-pre select-all">{{ chaptersOutput }}</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { createApp, ref, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js'
+
+    const DUPE_THRESHOLD = 900 // 15 min in seconds
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    const normalize = (p, t) => (p + t).toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    const timestampToSeconds = ts => {
+      const [hh, mm, ss] = ts.split(':').map(Number)
+      return hh * 3600 + mm * 60 + ss
+    }
+
+    // HH:MM:SS → "MM:SS" under 1h, "H:MM:SS" (or "HH:MM:SS") above
+    const formatChapterTime = ts => {
+      const [hh, mm, ss] = ts.split(':').map(Number)
+      if (hh === 0) return `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`
+      return `${hh}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`
+    }
+
+    function parseCue(content) {
+      const tracks = []
+      let cur = null
+      for (const raw of content.split('\n')) {
+        const line = raw.trim()
+        const trackM = line.match(/^TRACK\s+(\d+)\s+AUDIO/)
+        if (trackM) {
+          if (cur) tracks.push(cur)
+          cur = { index: parseInt(trackM[1]), performer: '', title: '', rawTimestamp: '', seconds: 0, removed: false }
+          continue
+        }
+        if (!cur) continue
+        const perfM  = line.match(/^PERFORMER\s+"(.+)"/)
+        if (perfM)  { cur.performer = perfM[1]; continue }
+        const titleM = line.match(/^TITLE\s+"(.+)"/)
+        if (titleM) { cur.title = titleM[1]; continue }
+        const idxM   = line.match(/^INDEX\s+01\s+(\d{2}:\d{2}:\d{2})/)
+        if (idxM)   { cur.rawTimestamp = idxM[1]; cur.seconds = timestampToSeconds(idxM[1]) }
+      }
+      if (cur) tracks.push(cur)
+      return tracks
+    }
+
+    // ── App ──────────────────────────────────────────────────────────
+
+    createApp({
+      setup() {
+        const mode         = ref('file')
+        const isDragging   = ref(false)
+        const fileName     = ref('')
+        const pasteContent = ref('')
+        const tracks       = ref([])
+        const parseError   = ref('')
+        const separator    = ref(' ')
+        const copied       = ref(false)
+
+        const processedTracks = computed(() => {
+          const visible = tracks.value.filter(t => !t.removed)
+          return visible.map(track => ({
+            ...track,
+            isDupe: visible.some(t =>
+              t.index < track.index &&
+              normalize(t.performer, t.title) === normalize(track.performer, track.title) &&
+              (track.seconds - t.seconds) < DUPE_THRESHOLD
+            )
+          }))
+        })
+
+        const visibleTracks  = computed(() => processedTracks.value)
+        const dupeCount      = computed(() => visibleTracks.value.filter(t => t.isDupe).length)
+
+        const chaptersOutput = computed(() =>
+          visibleTracks.value
+            .map(t => `${formatChapterTime(t.rawTimestamp)}${separator.value}${t.performer} - ${t.title}`)
+            .join('\n')
+        )
+
+        function handleContent(raw) {
+          parseError.value = ''
+          try {
+            const result = parseCue(raw)
+            if (!result.length) { parseError.value = 'No tracks found — valid .cue file?'; return }
+            tracks.value = result
+            console.log(`%c[CUE.WTF] ${result.length} tracks parsed`, 'color:#5b7fff;font-weight:500')
+            console.table(result.map(t => ({ '#': t.index, performer: t.performer, title: t.title, timestamp: t.rawTimestamp, seconds: t.seconds })))
+          } catch(e) {
+            parseError.value = 'Parse error — check the console'
+            console.error('[CUE.WTF]', e)
+          }
+        }
+
+        function readFile(file) {
+          if (!file) return
+          if (!file.name.endsWith('.cue')) { parseError.value = "That's not a .cue file chief"; return }
+          fileName.value = file.name
+          const reader  = new FileReader()
+          reader.onload = e => handleContent(e.target.result)
+          reader.readAsText(file)
+        }
+
+        async function copyToClipboard() {
+          try {
+            await navigator.clipboard.writeText(chaptersOutput.value)
+            copied.value = true
+            setTimeout(() => copied.value = false, 2000)
+          } catch(e) {
+            console.error('[CUE.WTF] clipboard error', e)
+          }
+        }
+
+        const killAllDupes = () => visibleTracks.value.filter(t => t.isDupe).forEach(t => {
+          const src = tracks.value.find(s => s.index === t.index)
+          if (src) src.removed = true
+        })
+        const removeTrack  = index => { const t = tracks.value.find(t => t.index === index); if (t) t.removed = true }
+        const clearAll     = ()    => { fileName.value = ''; pasteContent.value = ''; tracks.value = []; parseError.value = '' }
+        const onFileChange = e     => readFile(e.target.files[0])
+        const onDrop       = e     => { isDragging.value = false; readFile(e.dataTransfer.files[0]) }
+        const onPasteInput = ()    => { if (pasteContent.value.trim()) handleContent(pasteContent.value) }
+
+        return {
+          mode, isDragging, fileName, pasteContent, tracks, parseError,
+          separator, copied, visibleTracks, dupeCount, chaptersOutput,
+          onFileChange, onDrop, onPasteInput, clearAll, removeTrack, killAllDupes, copyToClipboard,
+        }
+      }
+    }).mount('#app')
+  </script>
+
+</body>
+</html>
