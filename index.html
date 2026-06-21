@@ -266,16 +266,36 @@
         download deduped .cue file
       </button>
 
+      <!-- Copy Mixcloud tracklist -->
+      <button
+        @click="copyMixcloud"
+        class="mb-3 w-full font-mono text-accent hover:text-bright bg-accent/10 hover:bg-accent/20 border border-accent/30 hover:border-accent/50 rounded-lg px-4 py-3 flex flex-col items-center justify-center gap-1 transition-colors">
+        <span class="text-xs flex items-center gap-2">
+          <svg v-if="!mixcloudCopied" width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          <svg v-else width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ mixcloudCopied ? 'copied!' : 'copy mixcloud tracklist' }}
+        </span>
+        <span class="text-dim text-[10px] normal-case">{{ mixcloudExample }}</span>
+      </button>
+
       <!-- Reveal + copy chapters -->
       <button
         v-if="!chaptersRevealed"
         @click="revealChapters"
-        class="mb-3 w-full font-mono text-xs text-accent hover:text-bright bg-accent/10 hover:bg-accent/20 border border-accent/30 hover:border-accent/50 rounded-lg px-4 py-3 flex items-center justify-center gap-2 transition-colors">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-          <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
-        copy the yt/soundcloud chapters
+        class="mb-3 w-full font-mono text-accent hover:text-bright bg-accent/10 hover:bg-accent/20 border border-accent/30 hover:border-accent/50 rounded-lg px-4 py-3 flex flex-col items-center justify-center gap-1 transition-colors">
+        <span class="text-xs flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          copy the yt/soundcloud chapters
+        </span>
+        <span class="text-dim text-[10px] normal-case">{{ chaptersExample }}</span>
       </button>
 
       <!-- Preview panel -->
@@ -394,6 +414,7 @@
         const parseError   = ref('')
         const separator    = ref(' ')
         const copied       = ref(false)
+        const mixcloudCopied   = ref(false)
         const chaptersRevealed = ref(false)
 
         const processedTracks = computed(() => {
@@ -416,6 +437,18 @@
             .map(t => `${formatChapterTime(t.rawTimestamp)}${separator.value}${t.performer} - ${t.title}`)
             .join('\n')
         )
+
+        // Mixcloud wants the full HH:MM:SS timestamp at the end of the line,
+        // unlike chapters which use the shortened MM:SS / H:MM:SS form.
+        const mixcloudOutput = computed(() =>
+          visibleTracks.value
+            .map(t => `${t.performer} - ${t.title} - ${t.rawTimestamp}`)
+            .join('\n')
+        )
+
+        // First line of each output, shown as a dimmed live preview under the button label.
+        const chaptersExample = computed(() => chaptersOutput.value.split('\n')[0] || '')
+        const mixcloudExample = computed(() => mixcloudOutput.value.split('\n')[0] || '')
 
         // Rebuilds a faithful .cue file from the original raw lines of each
         // surviving track, renumbering TRACK XX sequentially.
@@ -454,26 +487,33 @@
           reader.readAsText(file)
         }
 
-        async function copyToClipboard() {
+        async function copyText(text, copiedRef) {
           try {
-            await navigator.clipboard.writeText(chaptersOutput.value)
-            copied.value = true
-            setTimeout(() => copied.value = false, 2000)
+            await navigator.clipboard.writeText(text)
+            copiedRef.value = true
+            setTimeout(() => copiedRef.value = false, 2000)
           } catch(e) {
             console.error('[CUE.WTF] clipboard error', e)
           }
         }
+        const copyToClipboard = () => copyText(chaptersOutput.value, copied)
+        const copyMixcloud    = () => copyText(mixcloudOutput.value, mixcloudCopied)
 
-        function downloadCue() {
-          const blob = new Blob([dedupedCueOutput.value], { type: 'text/plain' })
+        function triggerDownload(content, filename) {
+          const blob = new Blob([content], { type: 'text/plain' })
           const url  = URL.createObjectURL(blob)
           const a    = document.createElement('a')
-          const base = fileName.value ? fileName.value.replace(/\.cue$/i, '') : 'tracklist'
           a.href     = url
-          a.download = `${base}-deduped.cue`
+          a.download = filename
           a.click()
           URL.revokeObjectURL(url)
         }
+
+        function baseName() {
+          return fileName.value ? fileName.value.replace(/\.cue$/i, '') : 'tracklist'
+        }
+
+        const downloadCue = () => triggerDownload(dedupedCueOutput.value, `${baseName()}-deduped.cue`)
 
         async function revealChapters() {
           chaptersRevealed.value = true
@@ -492,8 +532,8 @@
 
         return {
           mode, isDragging, fileName, pasteContent, tracks, parseError,
-          separator, copied, chaptersRevealed, visibleTracks, dupeCount, chaptersOutput, dedupedCueOutput,
-          onFileChange, onDrop, onPasteInput, clearAll, removeTrack, killAllDupes, copyToClipboard, revealChapters, downloadCue,
+          separator, copied, mixcloudCopied, chaptersRevealed, visibleTracks, dupeCount, chaptersOutput, chaptersExample, dedupedCueOutput, mixcloudOutput, mixcloudExample,
+          onFileChange, onDrop, onPasteInput, clearAll, removeTrack, killAllDupes, copyToClipboard, copyMixcloud, revealChapters, downloadCue,
         }
       }
     }).mount('#app')
